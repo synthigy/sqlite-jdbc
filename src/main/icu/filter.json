@@ -1,0 +1,12 @@
+{
+  "strategy": "additive",
+  "localeFilter": {
+    "filterType": "locale",
+    "includelist": ["root"],
+    "includeChildren": false
+  },
+  "featureFilters": {
+    "coll_ucadata": "include",
+    "coll_tree": "include"
+  }
+}

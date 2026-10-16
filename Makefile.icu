@@ -1,0 +1,110 @@
+# Static ICU for the HUMAN collation (src/main/ext/synthigy_human.c).
+# Only ICU's common + i18n libraries are compiled per target; the collation data
+# is the pre-filtered package in src/main/icu, linked in as a C array.
+
+ICU_VERSION := 78.3
+ICU_MAJOR := $(firstword $(subst ., ,$(ICU_VERSION)))
+ICU_SHA256 := 3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0
+ICU_DATA_SHA256 := 9d8b3899096aeb83e4e21ef8a40fec9e03b28db18c48452efac882ce25a91e27
+ICU_URL := https://github.com/unicode-org/icu/releases/download/release-$(ICU_VERSION)
+ICU_DIR := $(CURDIR)/$(TARGET)/icu-$(ICU_VERSION)
+ICU_ARCHIVE := $(ICU_DIR)/icu4c-$(ICU_VERSION)-sources.tgz
+ICU_SRC := $(ICU_DIR)/icu/source
+ICU_UNPACKED := $(ICU_DIR)/unpacked.stamp
+ICU_DAT := src/main/icu/icudt$(ICU_MAJOR)l.dat
+
+ICU_HOST := $(ICU_DIR)/build-host
+ICU_HOST_CC ?= gcc
+ICU_HOST_CXX ?= g++
+ICU_BUILD := $(ICU_DIR)/build-$(OS_NAME)-$(OS_ARCH)
+ICU_STAMP := $(ICU_BUILD)/built.stamp
+ICU_CXX ?= $(patsubst %gcc,%g++,$(patsubst %clang,%clang++,$(CC)))
+ICU_TRIPLE := $(subst .static,,$(notdir $(patsubst %-,%,$(CROSS_PREFIX))))
+ICU_TARGET_FLAGS := $(filter -mmacosx-version-min=%,$(CCFLAGS))
+ICU_FLAGS := -Os -fPIC -fvisibility=hidden -ffunction-sections -fdata-sections -DU_STATIC_IMPLEMENTATION $(ICU_TARGET_FLAGS)
+ICU_OPTIONS := --enable-static --disable-shared --with-data-packaging=archive --disable-dyload \
+	--disable-tests --disable-samples --disable-extras --disable-icuio --disable-layoutex --disable-tools
+
+ifeq ($(strip $(CROSS_PREFIX)),)
+ICU_CROSS :=
+ICU_CROSS_DEP :=
+else
+ICU_CROSS := --host=$(ICU_TRIPLE) --with-cross-build=$(ICU_HOST)
+ICU_CROSS_DEP := $(ICU_HOST)/config/icucross.mk
+endif
+
+ifeq ($(OS_NAME),Windows)
+ICU_LIBS := $(ICU_BUILD)/lib/libsicuin.a $(ICU_BUILD)/lib/libsicuuc.a
+else
+ICU_LIBS := $(ICU_BUILD)/lib/libicui18n.a $(ICU_BUILD)/lib/libicuuc.a
+endif
+
+ICU_DATA_OBJ := $(SQLITE_OUT)/icudata.o
+
+ifeq ($(OS_NAME),Mac)
+ICU_LINK := $(ICU_DATA_OBJ) $(ICU_LIBS) -lc++ -Wl,-dead_strip \
+	-Wl,-exported_symbol,_Java_* -Wl,-exported_symbol,_JNI_*
+else ifeq ($(OS_NAME),Windows)
+ICU_LINK := $(ICU_DATA_OBJ) $(ICU_LIBS) -static -lstdc++ -ladvapi32
+else
+ICU_LINK := -Wl,--gc-sections -Wl,--exclude-libs,ALL $(ICU_DATA_OBJ) $(ICU_LIBS) \
+	$(shell $(CC) -print-file-name=libstdc++.a)
+endif
+
+CCFLAGS := $(CCFLAGS) -I$(ICU_SRC)/common -I$(ICU_SRC)/i18n -DU_STATIC_IMPLEMENTATION \
+	-DSQLITE_EXTRA_INIT=synthigy_extra_init -Wno-error=implicit-function-declaration
+LINKFLAGS := $(LINKFLAGS) $(ICU_LINK)
+
+$(ICU_ARCHIVE):
+	@mkdir -p $(@D)
+	curl -L -f -o$@ $(ICU_URL)/icu4c-$(ICU_VERSION)-sources.tgz
+	echo "$(ICU_SHA256)  $@" | sha256sum -c -
+
+$(ICU_UNPACKED): $(ICU_ARCHIVE)
+	tar xzf $< -C $(ICU_DIR)
+	touch $@
+
+$(ICU_HOST)/config/icucross.mk: $(ICU_UNPACKED)
+	@mkdir -p $(ICU_HOST)
+	cd $(ICU_HOST) && CC=$(ICU_HOST_CC) CXX=$(ICU_HOST_CXX) $(ICU_SRC)/configure $(ICU_OPTIONS)
+	$(MAKE) -C $(ICU_HOST) config/icucross.mk config/icucross.inc
+
+$(ICU_STAMP): $(ICU_UNPACKED) $(ICU_CROSS_DEP)
+	@mkdir -p $(ICU_BUILD)
+	cd $(ICU_BUILD) && CC="$(CC)" CXX="$(ICU_CXX)" AR="$(CROSS_PREFIX)ar" RANLIB="$(CROSS_PREFIX)ranlib" \
+		CFLAGS="$(ICU_FLAGS)" CXXFLAGS="$(ICU_FLAGS) -fvisibility-inlines-hidden" \
+		$(ICU_SRC)/configure $(ICU_CROSS) $(ICU_OPTIONS)
+	@mkdir -p $(ICU_BUILD)/lib
+	$(MAKE) -C $(ICU_BUILD)/common
+	$(MAKE) -C $(ICU_BUILD)/i18n
+	touch $@
+
+$(ICU_LIBS): $(ICU_STAMP)
+
+$(ICU_DATA_OBJ): $(ICU_DAT)
+	@mkdir -p $(@D)
+	perl src/main/icu/dat2c.pl icudt$(ICU_MAJOR)_dat < $(ICU_DAT) > $(SQLITE_OUT)/icudata.c
+	$(CC) $(CCFLAGS) -c -o $@ $(SQLITE_OUT)/icudata.c
+
+$(SQLITE_OUT)/sqlite3.o: $(ICU_STAMP)
+$(SQLITE_OUT)/$(LIBNAME): $(ICU_DATA_OBJ) $(ICU_LIBS)
+
+# Regenerates src/main/icu/icudt<major>l.dat from ICU's data sources and src/main/icu/filter.json.
+# Run on a machine with a native toolchain and python3, then commit the result.
+ICU_DATAGEN := $(ICU_DIR)/datagen
+icu-data:
+	@mkdir -p $(ICU_DATAGEN)
+	curl -L -f -o$(ICU_DATAGEN)/sources.tgz $(ICU_URL)/icu4c-$(ICU_VERSION)-sources.tgz
+	echo "$(ICU_SHA256)  $(ICU_DATAGEN)/sources.tgz" | sha256sum -c -
+	curl -L -f -o$(ICU_DATAGEN)/data.zip $(ICU_URL)/icu4c-$(ICU_VERSION)-data.zip
+	echo "$(ICU_DATA_SHA256)  $(ICU_DATAGEN)/data.zip" | sha256sum -c -
+	tar xzf $(ICU_DATAGEN)/sources.tgz -C $(ICU_DATAGEN)
+	mv $(ICU_DATAGEN)/icu/source/data $(ICU_DATAGEN)/icu/source/data.prebuilt
+	unzip -q $(ICU_DATAGEN)/data.zip -d $(ICU_DATAGEN)/icu/source
+	@mkdir -p $(ICU_DATAGEN)/build
+	cd $(ICU_DATAGEN)/build && ICU_DATA_FILTER_FILE=$(CURDIR)/src/main/icu/filter.json \
+		$(ICU_DATAGEN)/icu/source/configure --with-data-packaging=archive --disable-tests --disable-samples
+	$(MAKE) -C $(ICU_DATAGEN)/build
+	cp $(ICU_DATAGEN)/build/data/out/icudt$(ICU_MAJOR)l.dat $(ICU_DAT)
+
+.PHONY: icu-data

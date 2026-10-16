@@ -401,7 +401,12 @@ public class SQLiteJDBCLoader {
         static {
             URL versionFile =
                     VersionHolder.class.getResource(
-                            "/META-INF/maven/org.xerial/sqlite-jdbc/pom.properties");
+                            "/META-INF/maven/com.synthigy/sqlite-jdbc/pom.properties");
+            if (versionFile == null) {
+                versionFile =
+                        VersionHolder.class.getResource(
+                                "/META-INF/maven/org.xerial/sqlite-jdbc/pom.properties");
+            }
             if (versionFile == null) {
                 versionFile =
                         VersionHolder.class.getResource(

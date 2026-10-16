@@ -1,0 +1,28 @@
+name: Release to Clojars
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 11
+          java-package: jdk
+          cache: 'maven'
+      - name: Every native library carries the HUMAN collation
+        run: |
+          for f in $(find src/main/resources/org/sqlite/native -type f); do
+            grep -a -q human_version "$f" || { echo "missing HUMAN collation: $f"; exit 1; }
+          done
+      - name: Test
+        run: mvn --batch-mode --no-transfer-progress test
+      - name: Deploy
+        run: mvn --batch-mode --no-transfer-progress -s settings.xml deploy -DskipTests
+        env:
+          CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+          CLOJARS_TOKEN: ${{ secrets.CLOJARS_TOKEN }}

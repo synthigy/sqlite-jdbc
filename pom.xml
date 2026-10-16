@@ -2,12 +2,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/maven-v4_0_0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.xerial</groupId>
+    <groupId>com.synthigy</groupId>
     <artifactId>sqlite-jdbc</artifactId>
-    <version>3.47.1.0</version>
+    <version>3.47.1.0-icu78.3</version>
     <name>SQLite JDBC</name>
-    <description>SQLite JDBC library</description>
-    <url>https://github.com/xerial/sqlite-jdbc</url>
+    <description>xerial/sqlite-jdbc with a statically linked ICU HUMAN collation</description>
+    <url>https://github.com/synthigy/sqlite-jdbc</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -53,6 +53,7 @@
                 <directory>src/main/resources</directory>
                 <includes>
                     <include>META-INF/native-image/**</include>
+                    <include>META-INF/licenses/**</include>
                 </includes>
             </resource>
             <resource>
@@ -259,16 +260,16 @@
     </build>
 
     <scm>
-        <connection>scm:git:git://github.com/xerial/sqlite-jdbc.git</connection>
-        <developerConnection>scm:git:git@github.com:xerial/sqlite-jdbc.git</developerConnection>
-        <url>https://github.com/xerial/sqlite-jdbc</url>
+        <connection>scm:git:git://github.com/synthigy/sqlite-jdbc.git</connection>
+        <developerConnection>scm:git:git@github.com:synthigy/sqlite-jdbc.git</developerConnection>
+        <url>https://github.com/synthigy/sqlite-jdbc</url>
     </scm>
 
     <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
+        <repository>
+            <id>clojars</id>
+            <url>https://repo.clojars.org</url>
+        </repository>
     </distributionManagement>
 
     <profiles>
