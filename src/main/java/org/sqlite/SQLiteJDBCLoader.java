@@ -405,6 +405,11 @@ public class SQLiteJDBCLoader {
             if (versionFile == null) {
                 versionFile =
                         VersionHolder.class.getResource(
+                                "/META-INF/maven/com.synthigy/sqlite-jdbc/VERSION");
+            }
+            if (versionFile == null) {
+                versionFile =
+                        VersionHolder.class.getResource(
                                 "/META-INF/maven/org.xerial/sqlite-jdbc/pom.properties");
             }
             if (versionFile == null) {
@@ -419,7 +424,7 @@ public class SQLiteJDBCLoader {
                     Properties versionData = new Properties();
                     versionData.load(versionFile.openStream());
                     version = versionData.getProperty("version", version);
-                    version = version.trim().replaceAll("[^0-9\\.]", "");
+                    version = version.trim().split("-", 2)[0].replaceAll("[^0-9\\.]", "");
                 }
             } catch (IOException e) {
                 // inline creation of logger to avoid build-time initialization of the logging
