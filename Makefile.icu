@@ -14,8 +14,9 @@ ICU_UNPACKED := $(ICU_DIR)/unpacked.stamp
 ICU_DAT := src/main/icu/icudt$(ICU_MAJOR)l.dat
 
 ICU_HOST := $(ICU_DIR)/build-host
-ICU_HOST_CC ?= gcc
-ICU_HOST_CXX ?= g++
+ICU_HOST_CC ?= /usr/bin/gcc
+ICU_HOST_CXX ?= /usr/bin/g++
+ICU_HOST_ENV := env -u CFLAGS -u CXXFLAGS -u CPPFLAGS -u LDFLAGS -u AR -u RANLIB -u LD PATH=/usr/local/bin:/usr/bin:/bin
 ICU_BUILD := $(ICU_DIR)/build-$(OS_NAME)-$(OS_ARCH)
 ICU_STAMP := $(ICU_BUILD)/built.stamp
 ICU_CXX ?= $(patsubst %gcc,%g++,$(patsubst %clang,%clang++,$(CC)))
@@ -66,8 +67,8 @@ $(ICU_UNPACKED): $(ICU_ARCHIVE)
 
 $(ICU_HOST)/config/icucross.mk: $(ICU_UNPACKED)
 	@mkdir -p $(ICU_HOST)
-	cd $(ICU_HOST) && CC=$(ICU_HOST_CC) CXX=$(ICU_HOST_CXX) $(ICU_SRC)/configure $(ICU_OPTIONS)
-	$(MAKE) -C $(ICU_HOST) config/icucross.mk config/icucross.inc
+	cd $(ICU_HOST) && $(ICU_HOST_ENV) CC=$(ICU_HOST_CC) CXX=$(ICU_HOST_CXX) $(ICU_SRC)/configure $(ICU_OPTIONS)
+	$(ICU_HOST_ENV) $(MAKE) -C $(ICU_HOST) config/icucross.mk config/icucross.inc
 
 $(ICU_STAMP): $(ICU_UNPACKED) $(ICU_CROSS_DEP)
 	@mkdir -p $(ICU_BUILD)
